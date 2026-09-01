@@ -1,0 +1,153 @@
+{
+  "display": {
+    "title": "Restic Backup Dashboard",
+    "subtitle": "Encrypted backup observability",
+    "provider_name": "Offsite storage",
+    "repository_name": "Restic repository"
+  },
+  "base_dir": "/var/lib/restic-automation",
+  "output_file": "/var/lib/restic-backup-dashboard/status.json",
+  "hostname": "",
+  "tasks": [
+    {
+      "id": "local",
+      "kind": "backup",
+      "name": "Incremental backup",
+      "schedule": "Every 15 minutes",
+      "service": "restic-local-backup.service",
+      "timer": "restic-local-backup.timer",
+      "success_marker": "markers/local.success",
+      "duration_marker": "markers/local.duration",
+      "healthy_for": "30m",
+      "error_after": "2h",
+      "running_label": "Creating an encrypted incremental snapshot"
+    },
+    {
+      "id": "offsite",
+      "kind": "sync",
+      "name": "Offsite synchronization",
+      "schedule": "Five minutes after completion",
+      "service": "restic-offsite-sync.service",
+      "timer": "restic-offsite-sync.timer",
+      "success_marker": "markers/offsite.success",
+      "duration_marker": "markers/offsite.duration",
+      "healthy_for": "30m",
+      "error_after": "4h",
+      "running_label": "Synchronizing encrypted repository objects"
+    },
+    {
+      "id": "audit",
+      "kind": "audit",
+      "name": "Restore verification",
+      "schedule": "Sunday at 05:00",
+      "service": "restic-restore-audit.service",
+      "timer": "restic-restore-audit.timer",
+      "success_marker": "markers/audit.success",
+      "duration_marker": "markers/audit.duration",
+      "healthy_for": "168h",
+      "error_after": "216h",
+      "running_label": "Restoring and verifying an encrypted sample"
+    }
+  ],
+  "sync": {
+    "task_id": "offsite",
+    "source_generation_marker": "markers/local.success",
+    "uploaded_generation_marker": "markers/offsite.generation",
+    "progress_log_glob": "logs/offsite-progress-*.log",
+    "success_event": "offsite_sync_success",
+    "error_after": "4h",
+    "snapshot_count_key": "snapshots"
+  },
+  "recovery": {
+    "audit_task_id": "audit",
+    "audit_source_id": "audit",
+    "success_event": "restore_audit_success",
+    "sample_percent": 1,
+    "retention": {"keep_last": 10, "keep_daily": 7},
+    "datasets": [
+      {
+        "id": "documents",
+        "name": "Documents",
+        "summary_file": "summaries/documents.jsonl",
+        "audit_size_key": "documents_bytes",
+        "audit_snapshot_key": "documents_snapshot",
+        "minimum_bytes": 1048576
+      },
+      {
+        "id": "photos",
+        "name": "Photos",
+        "summary_file": "summaries/photos.jsonl",
+        "audit_size_key": "photos_bytes",
+        "audit_snapshot_key": "photos_snapshot",
+        "minimum_bytes": 1048576
+      }
+    ],
+    "checks": [
+      {"id": "repository-open", "name": "Offsite Restic repository opens successfully"},
+      {"id": "representative-files", "name": "Representative files can be restored"},
+      {"id": "pack-sample", "name": "Encrypted pack sample reads successfully"}
+    ],
+    "local_semantic_event": "local_semantic_success",
+    "local_semantic_source_id": "local"
+  },
+  "storage": {
+    "zfs_dataset": "tank/backups/restic",
+    "warn_percent": 85,
+    "error_percent": 95,
+    "pool_command": ["zpool", "status", "-x"],
+    "pool_healthy_contains": "all pools are healthy"
+  },
+  "dependencies": [
+    {
+      "id": "restic-password",
+      "name": "Restic password file",
+      "kind": "file",
+      "path": "/etc/restic/password",
+      "command": [],
+      "expected_exact": "",
+      "expected_contains": "",
+      "healthy_summary": "Configured on backup host",
+      "error_summary": "Missing or empty"
+    }
+  ],
+  "events": {
+    "max_items": 50,
+    "sources": [
+      {
+        "id": "local",
+        "name": "Local backup",
+        "glob": "logs/local-events*.log",
+        "event_labels": {
+          "local_backup_start": {"severity": "info", "title": "Incremental backup started"},
+          "local_semantic_success": {"severity": "success", "title": "Local semantic checks passed"},
+          "local_backup_success": {"severity": "success", "title": "Incremental backup completed"},
+          "local_backup_error": {"severity": "error", "title": "Incremental backup failed"}
+        }
+      },
+      {
+        "id": "offsite",
+        "name": "Offsite sync",
+        "glob": "logs/offsite-events*.log",
+        "event_labels": {
+          "offsite_sync_start": {"severity": "info", "title": "Offsite synchronization started"},
+          "offsite_sync_success": {"severity": "success", "title": "Synchronization and reconciliation completed"},
+          "offsite_sync_error": {"severity": "error", "title": "Offsite synchronization failed"}
+        }
+      },
+      {
+        "id": "audit",
+        "name": "Restore verification",
+        "glob": "logs/audit-events*.log",
+        "event_labels": {
+          "restore_audit_start": {"severity": "info", "title": "Restore verification started"},
+          "restore_audit_success": {"severity": "success", "title": "Restore verification passed"},
+          "restore_audit_error": {"severity": "error", "title": "Restore verification failed"}
+        }
+      }
+    ]
+  },
+  "phase_rules": [
+    {"task_id": "offsite", "contains_all": ["rclone", "copy"], "label": "Uploading encrypted repository objects"},
+    {"task_id": "audit", "contains_all": ["restic", "restore"], "label": "Restoring the verification sample"}
+  ]
+}

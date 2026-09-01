@@ -1,0 +1,7 @@
+/bin/
+/runtime/
+/restic-backup-dashboard
+*.log
+.DS_Store
+.idea/
+.vscode/

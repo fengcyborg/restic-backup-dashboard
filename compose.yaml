@@ -1,0 +1,17 @@
+services:
+  dashboard:
+    build: .
+    image: ghcr.io/fengcyborg/restic-backup-dashboard:latest
+    command: ["serve", "--listen", "0.0.0.0:8080", "--status-file", "/data/status.json"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - "${STATUS_DIR:-./runtime}:/data:ro"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    restart: unless-stopped

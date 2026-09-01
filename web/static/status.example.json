@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-01T10:05:00+08:00",
+  "host": "backup-host",
+  "display": {
+    "title": "Restic Backup Dashboard",
+    "subtitle": "Encrypted backup observability",
+    "provider_name": "Offsite object storage",
+    "repository_name": "Restic repository"
+  },
+  "overall": {
+    "status": "healthy",
+    "summary": "Backup, offsite sync, and recovery verification are within policy",
+    "recovery_ready": true,
+    "recovery_summary": "The latest restore verification passed"
+  },
+  "pipeline": [
+    {
+      "id": "local",
+      "name": "Incremental backup",
+      "schedule": "Every 15 minutes",
+      "status": "healthy",
+      "active": false,
+      "last_success": "2026-09-01T09:59:42+08:00",
+      "age_seconds": 318,
+      "duration_seconds": 83,
+      "next_run": "2026-09-01T10:15:00+08:00",
+      "service": {"load_state": "loaded", "active_state": "inactive", "sub_state": "dead", "result": "success", "exit_status": 0, "available": true},
+      "timer": {"load_state": "loaded", "active_state": "active", "sub_state": "waiting", "next_run": "2026-09-01T10:15:00+08:00", "available": true}
+    },
+    {
+      "id": "offsite",
+      "name": "Offsite synchronization",
+      "schedule": "Five minutes after completion",
+      "status": "healthy",
+      "active": false,
+      "last_success": "2026-09-01T10:03:18+08:00",
+      "age_seconds": 102,
+      "duration_seconds": 124,
+      "next_run": "2026-09-01T10:08:18+08:00",
+      "service": {"load_state": "loaded", "active_state": "inactive", "sub_state": "dead", "result": "success", "exit_status": 0, "available": true},
+      "timer": {"load_state": "loaded", "active_state": "active", "sub_state": "waiting", "next_run": "2026-09-01T10:08:18+08:00", "available": true}
+    },
+    {
+      "id": "audit",
+      "name": "Restore verification",
+      "schedule": "Sunday at 05:00",
+      "status": "healthy",
+      "active": false,
+      "last_success": "2026-09-01T00:12:01+08:00",
+      "age_seconds": 35579,
+      "duration_seconds": 7924,
+      "next_run": "2026-09-06T05:07:13+08:00",
+      "service": {"load_state": "loaded", "active_state": "inactive", "sub_state": "dead", "result": "success", "exit_status": 0, "available": true},
+      "timer": {"load_state": "loaded", "active_state": "active", "sub_state": "waiting", "next_run": "2026-09-06T05:07:13+08:00", "available": true}
+    }
+  ],
+  "sync": {
+    "task_id": "offsite",
+    "caught_up": true,
+    "lag_seconds": 0,
+    "local_generation": "2026-09-01T09:59:42+08:00",
+    "uploaded_generation": "2026-09-01T09:59:42+08:00"
+  },
+  "recovery": {
+    "status": "healthy",
+    "last_audit": "2026-09-01T00:12:01+08:00",
+    "audit_age_seconds": 35579,
+    "total_restore_bytes": 3148135598288,
+    "remote_snapshot_count": 81,
+    "retention": {"keep_last": 10, "keep_daily": 7},
+    "sample_percent": 1,
+    "checks": [
+      {"id": "repository-open", "name": "Offsite Restic repository opens successfully", "passed": true, "checked_at": "2026-09-01T00:12:01+08:00"},
+      {"id": "semantic-size", "name": "Restorable dataset sizes meet policy", "passed": true, "checked_at": "2026-09-01T00:12:01+08:00"},
+      {"id": "representative-files", "name": "Representative files can be restored", "passed": true, "checked_at": "2026-09-01T00:12:01+08:00"},
+      {"id": "pack-sample", "name": "Encrypted pack sample reads successfully", "passed": true, "checked_at": "2026-09-01T00:12:01+08:00"}
+    ],
+    "datasets": [
+      {"id": "documents", "name": "Documents", "local_snapshot": "103db44fd829", "remote_snapshot": "103db44fd829", "local_bytes": 202513437719, "verified_restore_bytes": 202513437719},
+      {"id": "photos", "name": "Photos", "local_snapshot": "135cc9f5a77a", "remote_snapshot": "135cc9f5a77a", "local_bytes": 278158956721, "verified_restore_bytes": 278158956721},
+      {"id": "archives", "name": "Archives", "local_snapshot": "bb2d451022d0", "remote_snapshot": "bb2d451022d0", "local_bytes": 2667463203848, "verified_restore_bytes": 2667463203848}
+    ],
+    "local_semantic_check_available": true
+  },
+  "storage": {
+    "dataset": "tank/backups/restic",
+    "used_bytes": 1154487209165,
+    "available_bytes": 2144047674163,
+    "quota_bytes": 3298534883328,
+    "used_percent": 35,
+    "status": "healthy",
+    "pool": {"status": "healthy", "healthy": true, "summary": "Storage pool reports healthy"}
+  },
+  "dependencies": [
+    {"id": "offsite-gateway", "name": "Offsite storage gateway", "status": "healthy", "summary": "Available"},
+    {"id": "restic-key", "name": "Restic password file", "status": "healthy", "summary": "Configured on backup host"}
+  ],
+  "events": [
+    {"timestamp": "2026-09-01T10:03:18+08:00", "severity": "success", "source": "Offsite sync", "title": "Synchronization and reconciliation completed", "detail": "duration 124s · snapshots 81"},
+    {"timestamp": "2026-09-01T10:01:14+08:00", "severity": "info", "source": "Offsite sync", "title": "Synchronization started"},
+    {"timestamp": "2026-09-01T09:59:42+08:00", "severity": "success", "source": "Local backup", "title": "Incremental backup completed", "detail": "duration 83s"},
+    {"timestamp": "2026-09-01T00:12:01+08:00", "severity": "success", "source": "Restore verification", "title": "Restore verification passed", "detail": "duration 7924s"}
+  ]
+}

@@ -1,0 +1,25 @@
+[Unit]
+Description=Collect sanitized Restic backup dashboard status
+Documentation=https://github.com/fengcyborg/restic-backup-dashboard
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/restic-backup-dashboard collect --config /etc/restic-backup-dashboard/config.json
+User=root
+Group=root
+UMask=0022
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/var/lib/restic-backup-dashboard
+
+[Install]
+WantedBy=multi-user.target
