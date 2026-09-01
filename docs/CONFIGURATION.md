@@ -1,6 +1,109 @@
 # Configuration reference
 
+[简体中文](CONFIGURATION.zh-CN.md)
+
 The collector accepts strict JSON. Unknown fields are rejected so typos fail during `validate-config` instead of silently disabling a check. Start with [`configs/config.example.json`](../configs/config.example.json).
+
+Validate every edited configuration before collecting status:
+
+```bash
+restic-backup-dashboard validate-config --config /etc/restic-backup-dashboard/config.json
+```
+
+## General rules
+
+- `base_dir` is required. Relative marker, summary, log, dependency-file, and default output paths are resolved beneath it. Absolute paths remain absolute.
+- Durations are JSON strings accepted by Go's `time.ParseDuration`, such as `30m`, `2h`, or `168h`. There is no `d` unit; use hours for multi-day values.
+- Display names, schedules, summaries, and phase labels are trusted operator-authored text and may be localized. IDs, event tokens, JSON field names, status values, and metric names should remain stable ASCII identifiers.
+- Empty optional sections disable their observation. The dashboard never starts backup, sync, restore, retention, or scheduling jobs.
+
+## Top-level fields
+
+| Field | Required | Purpose |
+|---|---:|---|
+| `display` | No | Dashboard title, subtitle, provider name, and repository display name. Built-in English defaults fill empty values. |
+| `base_dir` | Yes | Base directory used to resolve relative input and output paths. |
+| `output_file` | No | Sanitized status destination. Defaults to `dashboard/status.json` below `base_dir`; `collect --output` overrides it. |
+| `hostname` | No | Public host label. The collector uses the operating-system hostname when empty. |
+| `tasks` | Yes | One or more backup, sync, or audit task definitions. |
+| `sync` | No | Local/offsite generation comparison and active transfer progress. |
+| `recovery` | No | Restore-audit policy signals and Restic summary projection. |
+| `storage` | No | Optional ZFS capacity and pool-health observation. |
+| `dependencies` | No | Explicit file and command probes. |
+| `events` | No | Allow-listed, sanitized event sources. |
+| `phase_rules` | No | Trusted labels selected by process-argument substring matches. |
+
+`display` accepts `title`, `subtitle`, `provider_name`, and `repository_name`. These values are copied to public status and must not contain sensitive infrastructure details.
+
+## Task fields
+
+Each entry in `tasks` accepts:
+
+| Field | Required | Purpose |
+|---|---:|---|
+| `id` | Yes | Unique stable identifier. Referenced by other sections and exported in metrics. |
+| `kind` | Yes | One of `backup`, `sync`, or `audit`. |
+| `name` | Yes | Browser-visible task name. |
+| `schedule` | No | Browser-visible description; it does not create a schedule. |
+| `service` | No | systemd service unit inspected with `systemctl show`. |
+| `timer` | No | systemd timer unit inspected for availability, activity, and next run. |
+| `success_marker` | No | File containing the latest successful generation or timestamp. |
+| `duration_marker` | No | File containing the latest successful duration. |
+| `healthy_for` | Yes | Positive freshness window for a healthy result. |
+| `error_after` | Yes | Positive error threshold, not shorter than `healthy_for`. |
+| `running_label` | No | Trusted fallback phase shown while the service is active. |
+
+Status evaluation is ordered: an active service is `running`; a failed service result or non-zero exit status other than `75` is `error`; a configured timer that is unavailable or inactive is `error`; a missing success marker is `unknown`; otherwise marker age produces `healthy`, `warning`, or `error`. Exit status `75` is reserved for temporary lock contention and falls back to marker freshness.
+
+## Sync fields
+
+Set `sync.task_id` to enable generation comparison. It must reference a task; `source_generation_marker`, `uploaded_generation_marker`, and a positive `error_after` are then required.
+
+- `progress_log_glob` locates the newest transfer-progress file while the sync task is active.
+- `success_event` names an event token used to find the latest remote snapshot count and must exist in an event source when set.
+- `snapshot_count_key` names the numeric event key that carries that count.
+
+If both generation markers exist, their sanitized values are compared exactly. When only the source marker exists, the sync is behind. A non-running sync task is `warning` while behind and becomes `error` after `sync.error_after`.
+
+## Recovery fields
+
+Set `recovery.audit_task_id` to enable recovery-readiness evaluation. It must reference a task, and `success_event` is required. `audit_source_id` can restrict that event to one configured source.
+
+- `sample_percent` is display metadata between 0 and 100; the audit job remains responsible for actually sampling data.
+- `retention.keep_last` and `retention.keep_daily` are non-negative display metadata. The dashboard does not run `forget` or `prune`.
+- Each `datasets` entry requires a unique `id` and a `name`. `summary_file` points to Restic JSON Lines output. When recovery is enabled, `audit_size_key` and `audit_snapshot_key` are required; `minimum_bytes` is a non-negative readiness threshold.
+- Each `checks` entry requires a unique `id` and a browser-visible `name`. Checks are declarative labels: the dashboard marks them passed together only when the audit event is fresh and every dataset has a valid snapshot plus enough verified bytes.
+- `local_semantic_event` and `local_semantic_source_id` optionally indicate that a separate local semantic check has been observed.
+
+The audit event is fresh through the referenced audit task's `error_after` threshold. Recovery is `healthy` only when a fresh success event exists and all configured dataset policies pass. It is `unknown` when no success event exists, otherwise `error`.
+
+## Storage fields
+
+- `zfs_dataset` enables `zfs list -Hp -o used,avail,quota`. Leave it empty on non-ZFS hosts.
+- `warn_percent` and `error_percent` default to 85 and 95. They must satisfy `0 <= warn_percent < error_percent <= 100`.
+- `pool_command` is an explicit argv array for a read-only pool-health probe. When `zfs_dataset` is set and the command is empty, it defaults to `zpool status -x`.
+- `pool_healthy_contains` is matched case-insensitively against stdout and defaults to `all pools are healthy`.
+
+If ZFS quota is unset, the collector uses `used + available` as the displayed total.
+
+## Dependency fields
+
+Each dependency requires a stable operational `id`, a browser-visible `name`, and a `kind`:
+
+- A `file` dependency requires `path` and is healthy only when it resolves to a non-empty regular file.
+- A `command` dependency requires an explicit `command` argv array. Exit status must be zero; non-empty `expected_exact` and `expected_contains` checks must also pass. No shell is inserted.
+
+`healthy_summary` and `error_summary` are trusted browser-visible messages. Raw file contents and command output are never exported. The entire configuration is trusted input: store it as root-owned `0644` or stricter and never let the web user or backup jobs edit it.
+
+## Event-source fields
+
+`events.max_items` defaults to 50 and cannot exceed 500. Each source requires a unique `id`, a display `name`, a `glob`, and an `event_labels` map. Each event token maps to a trusted `title` and one of the severities `info`, `success`, `warning`, or `error`.
+
+Tokens referenced by sync or recovery configuration must appear in at least one event source. Source IDs referenced by recovery configuration must also exist.
+
+## Phase-rule fields
+
+Each phase rule requires a task `task_id`, a non-empty `contains_all` list, and a trusted `label`. The collector reads `ps -eo args=` and selects the label when one process line contains every configured substring. Process arguments themselves are never exported. Use specific terms to avoid accidental matches.
 
 ## Marker contract
 
@@ -60,26 +163,14 @@ While the configured sync task is active, the newest `progress_log_glob` file is
 
 The visible phase label comes from trusted task configuration or a configured `phase_rule`; arbitrary text from a transfer log is not exposed.
 
-## Tasks
-
-Each task has a stable `id`, one of the kinds `backup`, `sync`, or `audit`, display labels, optional systemd service/timer units, marker paths, and two freshness thresholds:
-
-- up to `healthy_for`: healthy;
-- between `healthy_for` and `error_after`: warning;
-- older than `error_after`: error.
-
-An active service is `running`. A failed result or non-zero exit status is an error; exit status `75` is reserved for temporary lock contention and falls back to marker freshness.
-
-## Dependencies and command safety
-
-A `file` dependency only reports whether a configured regular file exists and is non-empty. A `command` dependency executes an explicit argv array, then compares trimmed stdout with `expected_exact` and/or `expected_contains`. Raw stdout is never returned to the browser.
-
-The configuration is trusted input. Store it as root-owned `0644` or stricter and never let the web user edit it.
-
-## Optional ZFS status
-
-Set `storage.zfs_dataset` to collect `used`, `available`, and quota values with `zfs list`. If quota is unset, the collector uses `used + available` as the displayed total. `pool_command` and `pool_healthy_contains` provide an explicit read-only health probe. Leave both empty on a non-ZFS host.
-
 ## Collection cadence
 
 The browser refreshes every 15 seconds, but it only displays the most recent JSON. The supplied timer regenerates JSON about once per minute. This keeps host-side command load tiny while making state changes visible in roughly 0–75 seconds. Backup/sync scheduling remains independent.
+
+## Input and execution limits
+
+- Marker and duration files must be regular, non-symbolic-link files no larger than 4 KiB.
+- Event, progress, and Restic summary readers accept regular files, inspect at most the last 16 MiB, and use a 1 MiB scanner line limit.
+- At most 5,000 parsed event records participate in policy evaluation; at most `events.max_items` are exported.
+- Every configured or built-in command has a 15-second timeout. Stdout larger than 4 MiB is rejected and stderr is discarded.
+- The HTTP server accepts status documents up to 4 MiB, requires `schema_version` 1, rejects unknown fields, and treats data older than `serve --max-status-age` as not ready.

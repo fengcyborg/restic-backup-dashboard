@@ -1,5 +1,7 @@
 # Security policy
 
+[简体中文](SECURITY.zh-CN.md)
+
 ## Reporting a vulnerability
 
 Please use GitHub's private vulnerability reporting feature for this repository. Do not include real repository URLs, provider tokens, Restic passwords, hostnames, or private paths in a public issue.

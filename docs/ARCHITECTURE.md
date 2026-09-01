@@ -1,5 +1,7 @@
 # Architecture and threat model
 
+[简体中文](ARCHITECTURE.zh-CN.md)
+
 ## Components
 
 The executable has two independent runtime modes:
@@ -41,3 +43,9 @@ Raw command output and arbitrary log messages are never copied into status JSON.
 The HTTP server accepts `GET` and `HEAD` only. It sets CSP, anti-framing, no-sniff, referrer, permissions, and cross-origin-opener headers. API responses are `no-store`; static assets may be cached for one hour.
 
 The supplied container drops all capabilities, runs as UID/GID 65532, uses a read-only root filesystem, and mounts status data read-only.
+
+## Change rules for maintainers
+
+Treat `status.json` as a public, versioned API contract. A status change must be reflected together in the model, collector, server validation, frontend, demonstration fixture, tests, and both language versions of the documentation. Incompatible changes require a schema-version decision rather than silently changing the meaning of an existing field.
+
+New observations should be projected into bounded, typed, allow-listed values. Do not expose arbitrary command output, paths, process arguments, log messages, or credentials. Features that need backup write access, repository credentials, authentication, or scheduling belong outside the read-only web process and require an explicit threat-model review.

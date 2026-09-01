@@ -5,7 +5,7 @@
 
 A secure, read-only dashboard for Restic backup pipelines. It turns success markers, systemd state, sanitized event logs, ZFS capacity, offsite sync progress, and restore-verification results into one responsive web view.
 
-[中文文档](README.zh-CN.md)
+[简体中文](README.zh-CN.md)
 
 ## Why this project exists
 
@@ -117,6 +117,13 @@ restic-backup-dashboard version
 ```
 
 Run a command with `-h` for its flags.
+
+## Documentation
+
+- [Configuration reference](docs/CONFIGURATION.md) ([简体中文](docs/CONFIGURATION.zh-CN.md))
+- [Architecture and threat model](docs/ARCHITECTURE.md) ([简体中文](docs/ARCHITECTURE.zh-CN.md))
+- [Contributing guide](CONTRIBUTING.md) ([简体中文](CONTRIBUTING.zh-CN.md))
+- [Security policy](SECURITY.md) ([简体中文](SECURITY.zh-CN.md))
 
 ## Project status
 
