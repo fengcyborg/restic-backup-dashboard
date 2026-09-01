@@ -111,6 +111,24 @@ func TestApplySyncStatusMarksLag(t *testing.T) {
 	}
 }
 
+func TestServiceIsRunningForTransitionalSystemdStates(t *testing.T) {
+	t.Parallel()
+	tests := map[string]bool{
+		"active":       true,
+		"activating":   true,
+		"reloading":    true,
+		"deactivating": true,
+		"inactive":     false,
+		"failed":       false,
+		"":             false,
+	}
+	for state, want := range tests {
+		if got := serviceIsRunning(state); got != want {
+			t.Errorf("serviceIsRunning(%q) = %t, want %t", state, got, want)
+		}
+	}
+}
+
 func writeTestFile(t *testing.T, base, name, content string) {
 	t.Helper()
 	path := filepath.Join(base, name)

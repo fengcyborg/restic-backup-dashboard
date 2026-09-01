@@ -82,7 +82,7 @@ func (c *Collector) collectTask(ctx context.Context, now time.Time, task config.
 	service := c.systemdUnit(ctx, task.Service)
 	timer := c.systemdUnit(ctx, task.Timer)
 	success := readMarker(c.config.Resolve(task.SuccessMarker))
-	active := task.Service != "" && service.Available && service.ActiveState == "active"
+	active := task.Service != "" && service.Available && serviceIsRunning(service.ActiveState)
 	status := taskStatus(now, task, service, timer, success, active)
 
 	result := model.Task{
@@ -107,6 +107,15 @@ func (c *Collector) collectTask(ctx context.Context, now time.Time, task config.
 		result.Phase = firstNonEmpty(detectedPhase, task.RunningLabel, "Task is running")
 	}
 	return result
+}
+
+func serviceIsRunning(activeState string) bool {
+	switch activeState {
+	case "active", "activating", "reloading", "deactivating":
+		return true
+	default:
+		return false
+	}
 }
 
 func taskStatus(now time.Time, task config.Task, service, timer model.SystemdUnit, success marker, active bool) string {
